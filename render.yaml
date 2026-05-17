@@ -11,6 +11,12 @@ services:
         value: openai/gpt-5.4
       - key: OPENROUTER_REASONING_EFFORT
         value: medium
+      - key: OPENROUTER_FORECASTER_MODEL
+        value: openai/gpt-5.4
+      - key: OPENROUTER_VERIFIER_MODEL
+        value: openai/gpt-5.4
+      - key: OPENROUTER_SYNTHESIZER_MODEL
+        value: openai/gpt-5.4
       - key: EXA_API_KEY
         sync: false
       - key: EXA_SEARCH_ROUNDS
@@ -21,6 +27,8 @@ services:
         value: "10"
       - key: EXA_USE_LLM_PLANNER
         value: "true"
+      - key: EXA_RESEARCH_MODE
+        value: llm
       - key: EXA_RESEARCH_MODEL
         value: openai/gpt-5.4-mini
       - key: EXA_RESEARCH_REASONING_EFFORT

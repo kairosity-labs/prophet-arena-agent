@@ -238,8 +238,12 @@ class ExaQueryPlanner:
 
     @classmethod
     def from_env(cls) -> "ExaQueryPlanner | None":
-        enabled = os.environ.get("EXA_USE_LLM_PLANNER", "true").lower()
-        if enabled in {"0", "false", "no", "off"}:
+        legacy_enabled = os.environ.get("EXA_USE_LLM_PLANNER", "true").lower()
+        research_mode = os.environ.get(
+            "EXA_RESEARCH_MODE",
+            "llm" if legacy_enabled not in {"0", "false", "no", "off"} else "structured",
+        ).lower()
+        if research_mode == "structured" or legacy_enabled in {"0", "false", "no", "off"}:
             return None
         api_key = os.environ.get("OPENROUTER_API_KEY")
         if not api_key:

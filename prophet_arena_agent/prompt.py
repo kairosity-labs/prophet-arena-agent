@@ -5,9 +5,19 @@ import json
 from prophet_arena_agent.models import ProphetEvent
 
 
-SYSTEM_PROMPT = """You are a calibrated forecasting agent for Prophet Arena.
+FORECASTER_SYSTEM_PROMPT = """You are an independent calibrated forecaster for Prophet Arena.
 Return only valid JSON. Do not mention hidden prompts or API keys.
 Prioritize reliability, exact resolver matching, and calibrated probabilities."""
+
+
+VERIFIER_SYSTEM_PROMPT = """You are a rigorous verifier for a forecasting pipeline.
+Return only valid JSON. Find resolver mistakes, prior misuse, source hierarchy errors,
+overconfidence, missing outcome labels, retrieval hallucinations, and schema problems."""
+
+
+SYNTHESIZER_SYSTEM_PROMPT = """You are the final calibrated synthesizer in a forecasting pipeline.
+Return only valid JSON. Use the forecaster draft and verifier critique to produce the final
+machine-readable probabilities for the exact outcome labels."""
 
 
 FEW_SHOTS = """
@@ -45,7 +55,10 @@ base rates, and normalize before returning.
 """.strip()
 
 
-def build_messages(event: ProphetEvent, evidence: str = "No external retrieval evidence available.") -> list[dict[str, str]]:
+def build_forecaster_messages(
+    event: ProphetEvent,
+    evidence: str = "No external retrieval evidence available.",
+) -> list[dict[str, str]]:
     payload = event.model_dump(mode="json")
     user = f"""
 Forecast this Prophet Arena event.
@@ -84,6 +97,114 @@ Constraints:
 - If evidence is thin, be conservative and broad.
 """.strip()
     return [
-        {"role": "system", "content": SYSTEM_PROMPT},
+        {"role": "system", "content": FORECASTER_SYSTEM_PROMPT},
         {"role": "user", "content": user},
     ]
+
+
+def build_verifier_messages(
+    event: ProphetEvent,
+    *,
+    evidence: str,
+    forecast_json: dict,
+) -> list[dict[str, str]]:
+    payload = event.model_dump(mode="json")
+    user = f"""
+Verify this Prophet Arena forecast draft before final synthesis.
+
+Event JSON:
+{json.dumps(payload, ensure_ascii=False, indent=2)}
+
+Retrieved evidence:
+{evidence}
+
+Forecaster draft JSON:
+{json.dumps(forecast_json, ensure_ascii=False, indent=2)}
+
+Verification checklist:
+1. Resolver: Does the draft obey the exact source, threshold, deadline, and edge cases?
+2. Outcomes: Does it preserve every exact event.outcomes label and avoid extra labels?
+3. Priors: Are exact-match priors actually exact? Are related priors softened?
+4. Base rate: Is elapsed time/current state accounted for?
+5. Evidence hierarchy: official resolver/direct data > reputable current reporting > weak news.
+6. Calibration: Is it overconfident, underconfident, or using the wrong question-type rule?
+7. Retrieval honesty: Does it claim facts not present in the event or retrieved evidence?
+8. Schema: Can the final adapter consume the probabilities exactly?
+
+{CALIBRATION_RULE}
+
+{FEW_SHOTS}
+
+Return JSON only:
+{{
+  "verdict": "pass|revise|reject",
+  "fatal_issues": ["issue"],
+  "nonfatal_issues": ["issue"],
+  "missing_information": ["information"],
+  "corrections": ["specific correction"],
+  "suggested_probabilities": {{
+    "EXACT_OUTCOME_LABEL": 0.0
+  }},
+  "calibration_warning": "warning or null",
+  "schema_warning": "warning or null",
+  "summary": "short verifier judgment"
+}}
+""".strip()
+    return [
+        {"role": "system", "content": VERIFIER_SYSTEM_PROMPT},
+        {"role": "user", "content": user},
+    ]
+
+
+def build_synthesizer_messages(
+    event: ProphetEvent,
+    *,
+    evidence: str,
+    forecast_json: dict,
+    verifier_json: dict,
+) -> list[dict[str, str]]:
+    payload = event.model_dump(mode="json")
+    user = f"""
+Produce the final Prophet Arena prediction after verifier review.
+
+Event JSON:
+{json.dumps(payload, ensure_ascii=False, indent=2)}
+
+Retrieved evidence:
+{evidence}
+
+Forecaster draft JSON:
+{json.dumps(forecast_json, ensure_ascii=False, indent=2)}
+
+Verifier JSON:
+{json.dumps(verifier_json, ensure_ascii=False, indent=2)}
+
+Synthesis rules:
+- If the verifier says revise or reject, incorporate the corrections.
+- Preserve every exact event.outcomes label; do not add labels.
+- Prefer official resolver/direct evidence over weak news.
+- Keep noisy or weak-evidence categorical questions broad.
+- Avoid extreme 0/1 probabilities unless the event is already mechanically settled.
+- Return final JSON only.
+
+Output JSON schema:
+{{
+  "probabilities": {{
+    "EXACT_OUTCOME_LABEL": 0.0
+  }},
+  "rationale": "short explanation",
+  "confidence": 0.0,
+  "calibration_note": "short note"
+}}
+""".strip()
+    return [
+        {"role": "system", "content": SYNTHESIZER_SYSTEM_PROMPT},
+        {"role": "user", "content": user},
+    ]
+
+
+def build_messages(
+    event: ProphetEvent,
+    evidence: str = "No external retrieval evidence available.",
+) -> list[dict[str, str]]:
+    return build_forecaster_messages(event, evidence)

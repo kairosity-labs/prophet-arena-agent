@@ -29,10 +29,14 @@ Copy `.env.example` to `.env` locally or set these variables in your deployment 
 OPENROUTER_API_KEY=...
 OPENROUTER_MODEL=openai/gpt-5.4
 OPENROUTER_REASONING_EFFORT=medium
+OPENROUTER_FORECASTER_MODEL=openai/gpt-5.4
+OPENROUTER_VERIFIER_MODEL=openai/gpt-5.4
+OPENROUTER_SYNTHESIZER_MODEL=openai/gpt-5.4
 EXA_API_KEY=...
 EXA_SEARCH_ROUNDS=2
 EXA_RESULTS_PER_QUERY=4
 EXA_MAX_SOURCES=10
+EXA_RESEARCH_MODE=llm
 EXA_USE_LLM_PLANNER=true
 EXA_RESEARCH_MODEL=openai/gpt-5.4-mini
 EXA_RESEARCH_REASONING_EFFORT=low
@@ -113,6 +117,7 @@ web: uvicorn prophet_arena_agent.server:app --host 0.0.0.0 --port ${PORT:-8000}
 The prompt is a compact, competition-neutral forecasting rubric:
 
 - Run bounded Exa retrieval over LLM-planned query rounds plus deterministic fallback queries.
+- Run a full forecast pipeline: forecaster draft, verifier critique, final synthesizer.
 - Frame the exact resolver and outcome labels.
 - Anchor on current state and exact priors when available.
 - Build a base rate for the remaining time window.
@@ -120,7 +125,7 @@ The prompt is a compact, competition-neutral forecasting rubric:
 - Apply a simple calibration formula.
 - Return exact-label probabilities.
 
-Retrieval uses a cheaper OpenRouter planning model by default (`openai/gpt-5.4-mini`) to propose query sets before Exa search. The forecaster stays on the frontier model configured by `OPENROUTER_MODEL` (`openai/gpt-5.4` by default).
+Retrieval uses a cheaper OpenRouter planning model by default (`openai/gpt-5.4-mini`) to propose query sets before Exa search. Set `EXA_RESEARCH_MODE=structured` to skip LLM query planning and use deterministic resolver/current-state/reference-class queries. The forecaster, verifier, and synthesizer stay on the frontier model configured by `OPENROUTER_MODEL` or the per-stage overrides (`OPENROUTER_FORECASTER_MODEL`, `OPENROUTER_VERIFIER_MODEL`, `OPENROUTER_SYNTHESIZER_MODEL`).
 
 The ExaResearch planner prompt asks for:
 

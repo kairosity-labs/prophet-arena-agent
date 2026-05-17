@@ -7,7 +7,11 @@ from typing import Any
 import httpx
 
 from prophet_arena_agent.models import ForecastJSON, Prediction, Probability, ProphetEvent
-from prophet_arena_agent.prompt import build_messages
+from prophet_arena_agent.prompt import (
+    build_forecaster_messages,
+    build_synthesizer_messages,
+    build_verifier_messages,
+)
 from prophet_arena_agent.retrieval import ExaRetriever, render_evidence
 
 
@@ -68,16 +72,26 @@ def extract_json(text: str) -> dict[str, Any]:
     raise ValueError("Model did not return a JSON object")
 
 
-async def call_openrouter(event: ProphetEvent, evidence: str) -> dict[str, Any]:
+def _stage_model(stage: str) -> str:
+    stage_key = f"OPENROUTER_{stage.upper()}_MODEL"
+    return os.environ.get(stage_key) or os.environ.get("OPENROUTER_MODEL", "openai/gpt-5.4")
+
+
+def _stage_reasoning_effort(stage: str) -> str:
+    stage_key = f"OPENROUTER_{stage.upper()}_REASONING_EFFORT"
+    return os.environ.get(stage_key) or os.environ.get("OPENROUTER_REASONING_EFFORT", "medium")
+
+
+async def call_openrouter_messages(messages: list[dict[str, str]], *, stage: str) -> dict[str, Any]:
     api_key = os.environ.get("OPENROUTER_API_KEY")
     if not api_key:
         raise RuntimeError("OPENROUTER_API_KEY is not set")
 
-    model = os.environ.get("OPENROUTER_MODEL", "openai/gpt-5.4")
-    reasoning_effort = os.environ.get("OPENROUTER_REASONING_EFFORT", "medium")
+    model = _stage_model(stage)
+    reasoning_effort = _stage_reasoning_effort(stage)
     payload: dict[str, Any] = {
         "model": model,
-        "messages": build_messages(event, evidence=evidence),
+        "messages": messages,
         "response_format": {"type": "json_object"},
     }
     if reasoning_effort and reasoning_effort.lower() != "none":
@@ -102,11 +116,31 @@ async def call_openrouter(event: ProphetEvent, evidence: str) -> dict[str, Any]:
     return extract_json(content)
 
 
+async def run_forecast_pipeline(event: ProphetEvent, evidence: str) -> dict[str, Any]:
+    forecast_json = await call_openrouter_messages(
+        build_forecaster_messages(event, evidence=evidence),
+        stage="forecaster",
+    )
+    verifier_json = await call_openrouter_messages(
+        build_verifier_messages(event, evidence=evidence, forecast_json=forecast_json),
+        stage="verifier",
+    )
+    return await call_openrouter_messages(
+        build_synthesizer_messages(
+            event,
+            evidence=evidence,
+            forecast_json=forecast_json,
+            verifier_json=verifier_json,
+        ),
+        stage="synthesizer",
+    )
+
+
 async def predict_event(event: ProphetEvent) -> Prediction:
     try:
         retriever = ExaRetriever.from_env()
         sources = await retriever.retrieve(event) if retriever else []
-        model_json = await call_openrouter(event, render_evidence(sources))
+        model_json = await run_forecast_pipeline(event, render_evidence(sources))
         return prediction_from_model_json(event, model_json)
     except Exception:
         # Completion rate matters in Prophet Arena. On provider failures, return a safe fallback.
