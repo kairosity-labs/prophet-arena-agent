@@ -45,7 +45,7 @@ base rates, and normalize before returning.
 """.strip()
 
 
-def build_messages(event: ProphetEvent) -> list[dict[str, str]]:
+def build_messages(event: ProphetEvent, evidence: str = "No external retrieval evidence available.") -> list[dict[str, str]]:
     payload = event.model_dump(mode="json")
     user = f"""
 Forecast this Prophet Arena event.
@@ -53,11 +53,14 @@ Forecast this Prophet Arena event.
 Event JSON:
 {json.dumps(payload, ensure_ascii=False, indent=2)}
 
+Retrieved evidence:
+{evidence}
+
 Method:
 Step 0: Restate the exact resolver, source, deadline, thresholds, and edge cases.
 Step 1: Identify exact-match priors if present; otherwise use current state/status quo.
 Step 2: Build a base rate from the relevant reference class and remaining time window.
-Step 3: Update on the strongest evidence available in the event text. Do not invent search results.
+Step 3: Update on retrieved evidence and the event text. Do not invent search results.
 Step 4: Apply the calibration rule. For listed outcomes, provide all labels.
 Step 5: Return machine-readable JSON only.
 

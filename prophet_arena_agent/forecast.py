@@ -8,6 +8,7 @@ import httpx
 
 from prophet_arena_agent.models import ForecastJSON, Prediction, Probability, ProphetEvent
 from prophet_arena_agent.prompt import build_messages
+from prophet_arena_agent.retrieval import ExaRetriever, render_evidence
 
 
 OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
@@ -67,7 +68,7 @@ def extract_json(text: str) -> dict[str, Any]:
     raise ValueError("Model did not return a JSON object")
 
 
-async def call_openrouter(event: ProphetEvent) -> dict[str, Any]:
+async def call_openrouter(event: ProphetEvent, evidence: str) -> dict[str, Any]:
     api_key = os.environ.get("OPENROUTER_API_KEY")
     if not api_key:
         raise RuntimeError("OPENROUTER_API_KEY is not set")
@@ -76,7 +77,7 @@ async def call_openrouter(event: ProphetEvent) -> dict[str, Any]:
     reasoning_effort = os.environ.get("OPENROUTER_REASONING_EFFORT", "medium")
     payload: dict[str, Any] = {
         "model": model,
-        "messages": build_messages(event),
+        "messages": build_messages(event, evidence=evidence),
         "response_format": {"type": "json_object"},
     }
     if reasoning_effort and reasoning_effort.lower() != "none":
@@ -103,7 +104,9 @@ async def call_openrouter(event: ProphetEvent) -> dict[str, Any]:
 
 async def predict_event(event: ProphetEvent) -> Prediction:
     try:
-        model_json = await call_openrouter(event)
+        retriever = ExaRetriever.from_env()
+        sources = await retriever.retrieve(event) if retriever else []
+        model_json = await call_openrouter(event, render_evidence(sources))
         return prediction_from_model_json(event, model_json)
     except Exception:
         # Completion rate matters in Prophet Arena. On provider failures, return a safe fallback.

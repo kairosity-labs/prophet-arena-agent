@@ -29,6 +29,10 @@ Copy `.env.example` to `.env` locally or set these variables in your deployment 
 OPENROUTER_API_KEY=...
 OPENROUTER_MODEL=openai/gpt-5.4
 OPENROUTER_REASONING_EFFORT=medium
+EXA_API_KEY=...
+EXA_SEARCH_ROUNDS=2
+EXA_RESULTS_PER_QUERY=4
+EXA_MAX_SOURCES=10
 
 # Optional. Leave blank unless you want to protect the endpoint yourself.
 AGENT_API_KEY=
@@ -101,6 +105,7 @@ web: uvicorn prophet_arena_agent.server:app --host 0.0.0.0 --port ${PORT:-8000}
 
 The prompt is a compact, competition-neutral forecasting rubric:
 
+- Run bounded Exa retrieval over the event title, rules, category, and outcomes.
 - Frame the exact resolver and outcome labels.
 - Anchor on current state and exact priors when available.
 - Build a base rate for the remaining time window.
@@ -108,4 +113,6 @@ The prompt is a compact, competition-neutral forecasting rubric:
 - Apply a simple calibration formula.
 - Return exact-label probabilities.
 
-No private datasets, prior GreenieBot traces, benchmark logs, or API keys are included in this public repo.
+Retrieval is intentionally bounded rather than open-ended: by default it runs `2` rounds, up to `5` deterministic queries per event, `4` Exa results per query, and keeps at most `10` sources. In normal conditions this should add a few seconds, not minutes.
+
+No private datasets, private analysis traces, benchmark logs, or API keys are included in this public repo.
