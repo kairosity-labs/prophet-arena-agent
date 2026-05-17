@@ -31,8 +31,10 @@ Avoid: "It is below 40 now, so it is very unlikely" when the score is already ne
 Good pattern:
 Question: Which of four outcomes wins?
 Reasoning behavior: preserve the exact outcome labels, assign a probability to every label,
-keep weak-evidence distributions broad, and normalize internally.
-Avoid: adding new labels or returning only the most likely option.
+keep weak-evidence probabilities broad, and do not force probabilities to sum to 1 unless
+the resolver explicitly says labels are exhaustive and mutually exclusive.
+Avoid: adding new labels, returning only the most likely option, or smearing to uniform only
+because the labels look non-exhaustive.
 
 Good pattern:
 Question: Will a named event happen in a short window?
@@ -51,8 +53,9 @@ Binary calibration rule:
 5. Apply at most once. Do not tune c to force a preferred answer.
 
 Categorical calibration rule:
-Assign every exact outcome label a probability, keep weak-evidence forecasts near broad
-base rates, and normalize before returning.
+Assign every exact outcome label a probability in [0, 1]. Treat Prophet Arena outcome labels
+as per-label probabilities that need not sum to 1; do not normalize unless the event rules
+explicitly define an exhaustive mutually exclusive set.
 """.strip()
 
 
@@ -95,6 +98,9 @@ Output JSON schema:
 Constraints:
 - Use exactly the labels in event.outcomes.
 - Every probability must be between 0 and 1.
+- Probabilities across labels need not sum to 1.
+- If all listed outcomes look unlikely because the labels appear stale or non-exhaustive,
+  return low probabilities for those labels rather than a uniform fallback.
 - If evidence is thin, be conservative and broad.
 """.strip()
     return [
@@ -130,7 +136,8 @@ Verification checklist:
 5. Evidence hierarchy: official resolver/direct data > reputable current reporting > weak news.
 6. Calibration: Is it overconfident, underconfident, or using the wrong question-type rule?
 7. Retrieval honesty: Does it claim facts not present in the event or retrieved evidence?
-8. Schema: Can the final adapter consume the probabilities exactly?
+8. Schema: Can the final adapter consume the probabilities exactly? Do not require
+   probabilities to sum to 1 for Prophet Arena listed outcomes.
 
 {CALIBRATION_RULE}
 
@@ -184,6 +191,8 @@ Synthesis rules:
 - Compare the independent branch drafts and verifier critiques before deciding.
 - If any verifier says revise or reject, incorporate the valid corrections.
 - Preserve every exact event.outcomes label; do not add labels.
+- Do not normalize, smear to uniform, or reject merely because listed probabilities do not
+  sum to 1.
 - Prefer official resolver/direct evidence over weak news.
 - Keep noisy or weak-evidence categorical questions broad.
 - Avoid extreme 0/1 probabilities unless the event is already mechanically settled.

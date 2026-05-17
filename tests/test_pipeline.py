@@ -16,11 +16,11 @@ def test_predict_event_runs_forecaster_verifier_and_synthesizer(monkeypatch) -> 
         if stage == "verifier":
             return {
                 "verdict": "revise",
-                "corrections": ["calibrate downward"],
-                "suggested_probabilities": {"Yes": 0.62, "No": 0.38},
+                "corrections": ["calibrate independently"],
+                "suggested_probabilities": {"Yes": 0.62, "No": 0.21},
             }
         return {
-            "probabilities": {"Yes": 0.62, "No": 0.38},
+            "probabilities": {"Yes": 0.62, "No": 0.21},
             "rationale": "synthesized after verifier",
         }
 
@@ -45,6 +45,6 @@ def test_predict_event_runs_forecaster_verifier_and_synthesizer(monkeypatch) -> 
     assert prediction.model_dump(mode="json") == {
         "probabilities": [
             {"market": "Yes", "probability": 0.62},
-            {"market": "No", "probability": 0.38},
+            {"market": "No", "probability": 0.21},
         ]
     }

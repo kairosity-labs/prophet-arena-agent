@@ -38,3 +38,31 @@ def test_binary_p_yes_maps_to_yes_no() -> None:
     assert prediction.probabilities[0].probability == 0.72
     assert prediction.probabilities[1].market == "No"
     assert prediction.probabilities[1].probability == 0.28
+
+
+def test_prediction_does_not_normalize_or_replace_all_zero_outputs() -> None:
+    event = ProphetEvent(title="Which listed teams can win?", outcomes=["A", "B", "C"])
+
+    prediction = prediction_from_model_json(
+        event,
+        {"probabilities": {"A": 0.0, "B": 0.0, "C": 0.0}},
+    )
+
+    assert prediction.model_dump(mode="json") == {
+        "probabilities": [
+            {"market": "A", "probability": 0.0},
+            {"market": "B", "probability": 0.0},
+            {"market": "C", "probability": 0.0},
+        ]
+    }
+
+
+def test_prediction_preserves_non_sum_to_one_probabilities() -> None:
+    event = ProphetEvent(title="Which listed teams can win?", outcomes=["A", "B", "C"])
+
+    prediction = prediction_from_model_json(
+        event,
+        {"probabilities": {"A": 0.02, "B": 0.0, "C": 0.4}},
+    )
+
+    assert [item.probability for item in prediction.probabilities] == [0.02, 0.0, 0.4]

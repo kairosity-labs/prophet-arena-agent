@@ -94,7 +94,7 @@ prophet forecast predict \
   -o predictions.json
 ```
 
-The docs note that probabilities do not have to sum to 1; they are normalized before scoring. This service still tries to produce coherent distributions.
+The docs note that probabilities do not have to sum to 1. This service preserves calibrated per-label probabilities exactly rather than normalizing them.
 
 ## Deploy
 

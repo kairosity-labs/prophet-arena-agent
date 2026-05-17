@@ -25,7 +25,7 @@ $$
 X = \\min(10 - c, 0.2p)
 $$
 
-where \(p\) is the raw percentage estimate and \(c\) is confidence on a 0-10 scale. The agent applies this idea carefully: it avoids mechanical over-adjustment, and for categorical questions it instead returns a full normalized probability vector over every exact label.
+where \(p\) is the raw percentage estimate and \(c\) is confidence on a 0-10 scale. The agent applies this idea carefully: it avoids mechanical over-adjustment, and for listed-outcome questions it returns calibrated per-label probabilities over every exact label without forcing them to sum to 1 unless the rules explicitly require that.
 
 The biggest lesson was that forecasting quality is not just model quality. The surrounding contract matters: exact labels, sane fallbacks, timeout safety, and provider failure handling are part of the forecasting system. A beautiful forecast that misses the schema is still a failed forecast.
 

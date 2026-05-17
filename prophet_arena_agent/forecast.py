@@ -50,8 +50,6 @@ def prediction_from_model_json(event: ProphetEvent, data: dict[str, Any]) -> Pre
             value = 0.0
         cleaned.append(Probability(market=outcome, probability=max(0.0, min(1.0, float(value)))))
 
-    if sum(item.probability for item in cleaned) <= 0:
-        return uniform_prediction(event)
     return Prediction(probabilities=cleaned)
 
 
