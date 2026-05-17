@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import json
 import os
 from typing import Any
@@ -82,6 +83,13 @@ def _stage_reasoning_effort(stage: str) -> str:
     return os.environ.get(stage_key) or os.environ.get("OPENROUTER_REASONING_EFFORT", "medium")
 
 
+def _forecast_branch_count() -> int:
+    try:
+        return max(1, int(os.environ.get("FORECAST_BRANCH_COUNT", "2")))
+    except ValueError:
+        return 2
+
+
 async def call_openrouter_messages(messages: list[dict[str, str]], *, stage: str) -> dict[str, Any]:
     api_key = os.environ.get("OPENROUTER_API_KEY")
     if not api_key:
@@ -116,7 +124,12 @@ async def call_openrouter_messages(messages: list[dict[str, str]], *, stage: str
     return extract_json(content)
 
 
-async def run_forecast_pipeline(event: ProphetEvent, evidence: str) -> dict[str, Any]:
+async def _run_forecaster_verifier_branch(
+    event: ProphetEvent,
+    *,
+    evidence: str,
+    branch: int,
+) -> dict[str, Any]:
     forecast_json = await call_openrouter_messages(
         build_forecaster_messages(event, evidence=evidence),
         stage="forecaster",
@@ -125,12 +138,29 @@ async def run_forecast_pipeline(event: ProphetEvent, evidence: str) -> dict[str,
         build_verifier_messages(event, evidence=evidence, forecast_json=forecast_json),
         stage="verifier",
     )
+    return {"branch": branch, "forecast": forecast_json, "verifier": verifier_json}
+
+
+async def run_forecast_pipeline(event: ProphetEvent, evidence: str) -> dict[str, Any]:
+    branches = await asyncio.gather(
+        *[
+            _run_forecaster_verifier_branch(event, evidence=evidence, branch=idx + 1)
+            for idx in range(_forecast_branch_count())
+        ]
+    )
     return await call_openrouter_messages(
         build_synthesizer_messages(
             event,
             evidence=evidence,
-            forecast_json=forecast_json,
-            verifier_json=verifier_json,
+            forecast_json=[branch["forecast"] for branch in branches],
+            verifier_json=[
+                {
+                    "branch": branch["branch"],
+                    "verifier": branch["verifier"],
+                    "forecast": branch["forecast"],
+                }
+                for branch in branches
+            ],
         ),
         stage="synthesizer",
     )

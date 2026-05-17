@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from typing import Any
 
 from prophet_arena_agent.models import ProphetEvent
 
@@ -160,8 +161,8 @@ def build_synthesizer_messages(
     event: ProphetEvent,
     *,
     evidence: str,
-    forecast_json: dict,
-    verifier_json: dict,
+    forecast_json: Any,
+    verifier_json: Any,
 ) -> list[dict[str, str]]:
     payload = event.model_dump(mode="json")
     user = f"""
@@ -173,14 +174,15 @@ Event JSON:
 Retrieved evidence:
 {evidence}
 
-Forecaster draft JSON:
+Forecaster draft JSON(s):
 {json.dumps(forecast_json, ensure_ascii=False, indent=2)}
 
-Verifier JSON:
+Verifier JSON(s):
 {json.dumps(verifier_json, ensure_ascii=False, indent=2)}
 
 Synthesis rules:
-- If the verifier says revise or reject, incorporate the corrections.
+- Compare the independent branch drafts and verifier critiques before deciding.
+- If any verifier says revise or reject, incorporate the valid corrections.
 - Preserve every exact event.outcomes label; do not add labels.
 - Prefer official resolver/direct evidence over weak news.
 - Keep noisy or weak-evidence categorical questions broad.

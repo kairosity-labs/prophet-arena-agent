@@ -32,6 +32,7 @@ OPENROUTER_REASONING_EFFORT=medium
 OPENROUTER_FORECASTER_MODEL=openai/gpt-5.4
 OPENROUTER_VERIFIER_MODEL=openai/gpt-5.4
 OPENROUTER_SYNTHESIZER_MODEL=openai/gpt-5.4
+FORECAST_BRANCH_COUNT=2
 EXA_API_KEY=...
 EXA_SEARCH_ROUNDS=2
 EXA_RESULTS_PER_QUERY=4
@@ -117,7 +118,7 @@ web: uvicorn prophet_arena_agent.server:app --host 0.0.0.0 --port ${PORT:-8000}
 The prompt is a compact, competition-neutral forecasting rubric:
 
 - Run bounded Exa retrieval over LLM-planned query rounds plus deterministic fallback queries.
-- Run a full forecast pipeline: forecaster draft, verifier critique, final synthesizer.
+- Run a full forecast pipeline: one evidence pass, parallel forecaster->verifier branches, final synthesizer.
 - Frame the exact resolver and outcome labels.
 - Anchor on current state and exact priors when available.
 - Build a base rate for the remaining time window.
@@ -126,6 +127,7 @@ The prompt is a compact, competition-neutral forecasting rubric:
 - Return exact-label probabilities.
 
 Retrieval uses a cheaper OpenRouter planning model by default (`openai/gpt-5.4-mini`) to propose query sets before Exa search. Set `EXA_RESEARCH_MODE=structured` to skip LLM query planning and use deterministic resolver/current-state/reference-class queries. The forecaster, verifier, and synthesizer stay on the frontier model configured by `OPENROUTER_MODEL` or the per-stage overrides (`OPENROUTER_FORECASTER_MODEL`, `OPENROUTER_VERIFIER_MODEL`, `OPENROUTER_SYNTHESIZER_MODEL`).
+`FORECAST_BRANCH_COUNT` controls how many independent forecaster->verifier branches run after retrieval; the default is `2`.
 
 The ExaResearch planner prompt asks for:
 

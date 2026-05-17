@@ -30,6 +30,7 @@ def test_predict_event_runs_forecaster_verifier_and_synthesizer(monkeypatch) -> 
         fake_call_openrouter_messages,
     )
     monkeypatch.setattr(forecast_module.ExaRetriever, "from_env", staticmethod(lambda: None))
+    monkeypatch.setenv("FORECAST_BRANCH_COUNT", "2")
 
     prediction = asyncio.run(
         forecast_module.predict_event(
@@ -37,7 +38,10 @@ def test_predict_event_runs_forecaster_verifier_and_synthesizer(monkeypatch) -> 
         )
     )
 
-    assert calls == ["forecaster", "verifier", "synthesizer"]
+    assert calls.count("forecaster") == 2
+    assert calls.count("verifier") == 2
+    assert calls.count("synthesizer") == 1
+    assert calls[-1] == "synthesizer"
     assert prediction.model_dump(mode="json") == {
         "probabilities": [
             {"market": "Yes", "probability": 0.62},
