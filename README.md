@@ -33,6 +33,13 @@ EXA_API_KEY=...
 EXA_SEARCH_ROUNDS=2
 EXA_RESULTS_PER_QUERY=4
 EXA_MAX_SOURCES=10
+EXA_USE_LLM_PLANNER=true
+EXA_RESEARCH_MODEL=openai/gpt-5.4-mini
+EXA_RESEARCH_REASONING_EFFORT=low
+EXA_RESEARCH_QUERIES_PER_ROUND=4
+EXA_RESEARCH_TIMEOUT_SECONDS=25
+EXA_RESEARCH_MAX_SECONDS=420
+EXA_SEARCH_TIMEOUT_SECONDS=20
 
 # Optional. Leave blank unless you want to protect the endpoint yourself.
 AGENT_API_KEY=
@@ -105,7 +112,7 @@ web: uvicorn prophet_arena_agent.server:app --host 0.0.0.0 --port ${PORT:-8000}
 
 The prompt is a compact, competition-neutral forecasting rubric:
 
-- Run bounded Exa retrieval over the event title, rules, category, and outcomes.
+- Run bounded Exa retrieval over LLM-planned query rounds plus deterministic fallback queries.
 - Frame the exact resolver and outcome labels.
 - Anchor on current state and exact priors when available.
 - Build a base rate for the remaining time window.
@@ -113,6 +120,18 @@ The prompt is a compact, competition-neutral forecasting rubric:
 - Apply a simple calibration formula.
 - Return exact-label probabilities.
 
-Retrieval is intentionally bounded rather than open-ended: by default it runs `2` rounds, up to `5` deterministic queries per event, `4` Exa results per query, and keeps at most `10` sources. In normal conditions this should add a few seconds, not minutes.
+Retrieval uses a cheaper OpenRouter planning model by default (`openai/gpt-5.4-mini`) to propose query sets before Exa search. The forecaster stays on the frontier model configured by `OPENROUTER_MODEL` (`openai/gpt-5.4` by default).
+
+The ExaResearch planner prompt asks for:
+
+- official resolver/source-of-truth queries first,
+- current-state or threshold-status queries second,
+- reference-class/base-rate queries third,
+- category-specific updates and disconfirming checks last,
+- reputable news corroboration only when official sources do not settle the question.
+
+The source targets are intentionally explicit: Reuters/AP/BBC/FT/Bloomberg/WSJ for news corroboration; BLS/FRED/BEA/Census/EIA/SEC/Congress/Federal Register/FEC/court pages for US data and policy; official AI lab and benchmark pages for AI; NOAA/NHC/CDC/WHO/NASA/JPL for weather, health, and science; official league/team pages plus injury/odds/stat sources for sports.
+
+Retrieval is bounded rather than open-ended: by default it runs `2` rounds, up to `4` planner/fallback queries per round, `4` Exa results per query, keeps at most `10` sources, gives each planner call `25s`, each Exa search `20s`, and caps the full retrieval stage at `420s`. That leaves room for frontier forecasting while staying well under a 10-minute target in normal conditions.
 
 No private datasets, private analysis traces, benchmark logs, or API keys are included in this public repo.
