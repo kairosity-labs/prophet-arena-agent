@@ -5,18 +5,18 @@ services:
     plan: starter
     healthCheckPath: /health
     envVars:
-      - key: OPENROUTER_API_KEY
+      - key: OPENAI_API_KEY
         sync: false
-      - key: OPENROUTER_MODEL
-        value: openai/gpt-5.4
-      - key: OPENROUTER_REASONING_EFFORT
+      - key: OPENAI_MODEL
+        value: gpt-5.5
+      - key: OPENAI_REASONING_EFFORT
         value: medium
-      - key: OPENROUTER_FORECASTER_MODEL
-        value: openai/gpt-5.4
-      - key: OPENROUTER_VERIFIER_MODEL
-        value: openai/gpt-5.4
-      - key: OPENROUTER_SYNTHESIZER_MODEL
-        value: openai/gpt-5.4
+      - key: OPENAI_FORECASTER_MODEL
+        value: gpt-5.5
+      - key: OPENAI_VERIFIER_MODEL
+        value: gpt-5.5
+      - key: OPENAI_SYNTHESIZER_MODEL
+        value: gpt-5.5
       - key: EXA_API_KEY
         sync: false
       - key: EXA_SEARCH_ROUNDS
@@ -30,7 +30,7 @@ services:
       - key: EXA_RESEARCH_MODE
         value: llm
       - key: EXA_RESEARCH_MODEL
-        value: openai/gpt-5.4-mini
+        value: gpt-5.4-mini
       - key: EXA_RESEARCH_REASONING_EFFORT
         value: low
       - key: EXA_RESEARCH_QUERIES_PER_ROUND

@@ -38,8 +38,8 @@ The main challenge was keeping the public submission small while preserving the 
 - Pydantic
 - Uvicorn
 - HTTPX
-- OpenRouter API
-- GPT-5.4-compatible model routing
+- OpenAI API
+- GPT-5.5 / GPT-5.4-family OpenAI models
 - Docker
 - Prophet Arena / Prophet Hacks forecasting endpoint contract
 - Pytest

@@ -5,8 +5,6 @@ import json
 import os
 from typing import Any
 
-import httpx
-
 from prophet_arena_agent.models import ForecastJSON, Prediction, Probability, ProphetEvent
 from prophet_arena_agent.prompt import (
     build_forecaster_messages,
@@ -14,9 +12,6 @@ from prophet_arena_agent.prompt import (
     build_verifier_messages,
 )
 from prophet_arena_agent.retrieval import ExaRetriever, render_evidence
-
-
-OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
 
 
 def uniform_prediction(event: ProphetEvent) -> Prediction:
@@ -74,13 +69,18 @@ def extract_json(text: str) -> dict[str, Any]:
 
 
 def _stage_model(stage: str) -> str:
-    stage_key = f"OPENROUTER_{stage.upper()}_MODEL"
-    return os.environ.get(stage_key) or os.environ.get("OPENROUTER_MODEL", "openai/gpt-5.4")
+    stage_key = f"OPENAI_{stage.upper()}_MODEL"
+    model = os.environ.get(stage_key) or os.environ.get("OPENAI_MODEL", "gpt-5.5")
+    return model.removeprefix("openai/")
 
 
 def _stage_reasoning_effort(stage: str) -> str:
-    stage_key = f"OPENROUTER_{stage.upper()}_REASONING_EFFORT"
-    return os.environ.get(stage_key) or os.environ.get("OPENROUTER_REASONING_EFFORT", "medium")
+    stage_key = f"OPENAI_{stage.upper()}_REASONING_EFFORT"
+    return os.environ.get(stage_key) or os.environ.get("OPENAI_REASONING_EFFORT", "medium")
+
+
+def _uses_reasoning_controls(model: str) -> bool:
+    return model.startswith(("gpt-5", "o"))
 
 
 def _forecast_branch_count() -> int:
@@ -90,37 +90,34 @@ def _forecast_branch_count() -> int:
         return 2
 
 
-async def call_openrouter_messages(messages: list[dict[str, str]], *, stage: str) -> dict[str, Any]:
-    api_key = os.environ.get("OPENROUTER_API_KEY")
+async def call_openai_messages(messages: list[dict[str, str]], *, stage: str) -> dict[str, Any]:
+    api_key = os.environ.get("OPENAI_API_KEY")
     if not api_key:
-        raise RuntimeError("OPENROUTER_API_KEY is not set")
+        raise RuntimeError("OPENAI_API_KEY is not set")
+
+    try:
+        from openai import AsyncOpenAI
+    except ImportError as exc:
+        raise RuntimeError("Install the openai package to use the default backend") from exc
 
     model = _stage_model(stage)
     reasoning_effort = _stage_reasoning_effort(stage)
     payload: dict[str, Any] = {
         "model": model,
-        "messages": messages,
-        "response_format": {"type": "json_object"},
+        "input": messages,
     }
-    if reasoning_effort and reasoning_effort.lower() != "none":
+    if reasoning_effort and reasoning_effort.lower() != "none" and _uses_reasoning_controls(model):
         payload["reasoning"] = {"effort": reasoning_effort}
+    client = AsyncOpenAI(api_key=api_key, timeout=120)
+    try:
+        response = await client.responses.create(**payload)
+    except Exception:
+        if "reasoning" not in payload:
+            raise
+        payload.pop("reasoning", None)
+        response = await client.responses.create(**payload)
 
-    headers = {
-        "authorization": f"Bearer {api_key}",
-        "content-type": "application/json",
-        "http-referer": "https://github.com/kairosity-labs/prophet-arena-agent",
-        "x-title": "Kairosity Prophet Arena Agent",
-    }
-
-    async with httpx.AsyncClient(timeout=120) as client:
-        response = await client.post(OPENROUTER_URL, headers=headers, json=payload)
-        if response.status_code == 400 and "reasoning" in payload:
-            payload.pop("reasoning", None)
-            response = await client.post(OPENROUTER_URL, headers=headers, json=payload)
-        response.raise_for_status()
-        data = response.json()
-
-    content = data.get("choices", [{}])[0].get("message", {}).get("content", "")
+    content = getattr(response, "output_text", None) or str(response)
     return extract_json(content)
 
 
@@ -130,11 +127,11 @@ async def _run_forecaster_verifier_branch(
     evidence: str,
     branch: int,
 ) -> dict[str, Any]:
-    forecast_json = await call_openrouter_messages(
+    forecast_json = await call_openai_messages(
         build_forecaster_messages(event, evidence=evidence),
         stage="forecaster",
     )
-    verifier_json = await call_openrouter_messages(
+    verifier_json = await call_openai_messages(
         build_verifier_messages(event, evidence=evidence, forecast_json=forecast_json),
         stage="verifier",
     )
@@ -148,7 +145,7 @@ async def run_forecast_pipeline(event: ProphetEvent, evidence: str) -> dict[str,
             for idx in range(_forecast_branch_count())
         ]
     )
-    return await call_openrouter_messages(
+    return await call_openai_messages(
         build_synthesizer_messages(
             event,
             evidence=evidence,

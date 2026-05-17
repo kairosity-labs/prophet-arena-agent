@@ -3,6 +3,7 @@ from __future__ import annotations
 from prophet_arena_agent.models import ProphetEvent
 from prophet_arena_agent.retrieval import (
     EXA_RESEARCH_SYSTEM,
+    ExaQueryPlanner,
     build_research_planner_messages,
     build_round_queries,
     parse_planned_queries,
@@ -64,3 +65,15 @@ def test_parse_planned_queries_dedupes_and_bounds() -> None:
     )
 
     assert parsed == ["NOAA March 2026 report"]
+
+
+def test_query_planner_uses_openai_key_by_default(monkeypatch) -> None:
+    monkeypatch.setenv("OPENAI_API_KEY", "openai-test-key")
+    monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
+    monkeypatch.setenv("EXA_RESEARCH_MODEL", "openai/gpt-5.4-mini")
+
+    planner = ExaQueryPlanner.from_env()
+
+    assert planner is not None
+    assert planner.api_key == "openai-test-key"
+    assert planner.model == "gpt-5.4-mini"

@@ -12,8 +12,6 @@ import httpx
 from prophet_arena_agent.models import ProphetEvent
 
 
-OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
-
 EXA_RESEARCH_SYSTEM = """
 You are ExaResearch, a bounded research-query planner for a forecasting agent.
 Your only job is to propose high-yield Exa web-search queries. Do not forecast.
@@ -160,6 +158,10 @@ def _extract_json_object(text: str) -> dict[str, Any]:
     return {}
 
 
+def _normalize_openai_model(model: str) -> str:
+    return model.removeprefix("openai/")
+
+
 def parse_planned_queries(text: str, max_queries: int) -> list[str]:
     data = _extract_json_object(text)
     raw_queries = data.get("queries", [])
@@ -245,13 +247,15 @@ class ExaQueryPlanner:
         ).lower()
         if research_mode == "structured" or legacy_enabled in {"0", "false", "no", "off"}:
             return None
-        api_key = os.environ.get("OPENROUTER_API_KEY")
+        api_key = os.environ.get("OPENAI_API_KEY")
         if not api_key:
             return None
         return cls(
             api_key=api_key,
-            model=os.environ.get("EXA_RESEARCH_MODEL")
-            or os.environ.get("OPENROUTER_MODEL", "openai/gpt-5.4-mini"),
+            model=_normalize_openai_model(
+                os.environ.get("EXA_RESEARCH_MODEL")
+                or os.environ.get("OPENAI_RETRIEVAL_MODEL", "gpt-5.4-mini")
+            ),
             reasoning_effort=os.environ.get("EXA_RESEARCH_REASONING_EFFORT", "low"),
             timeout_seconds=float(os.environ.get("EXA_RESEARCH_TIMEOUT_SECONDS", "25")),
             max_queries=int(os.environ.get("EXA_RESEARCH_QUERIES_PER_ROUND", "4")),
@@ -265,36 +269,33 @@ class ExaQueryPlanner:
         previous_sources: list[RetrievedSource],
         fallback_queries: list[str],
     ) -> list[str]:
+        try:
+            from openai import AsyncOpenAI
+        except ImportError:
+            return []
+
         payload: dict[str, Any] = {
             "model": self.model,
-            "messages": build_research_planner_messages(
+            "input": build_research_planner_messages(
                 event,
                 round_index=round_index,
                 previous_sources=previous_sources,
                 fallback_queries=fallback_queries,
                 max_queries=self.max_queries,
             ),
-            "response_format": {"type": "json_object"},
         }
         if self.reasoning_effort and self.reasoning_effort.lower() != "none":
             payload["reasoning"] = {"effort": self.reasoning_effort}
 
-        headers = {
-            "authorization": f"Bearer {self.api_key}",
-            "content-type": "application/json",
-            "http-referer": "https://github.com/kairosity-labs/prophet-arena-agent",
-            "x-title": "Kairosity Prophet Arena ExaResearch",
-        }
-
-        async with httpx.AsyncClient(timeout=self.timeout_seconds) as client:
-            response = await client.post(OPENROUTER_URL, headers=headers, json=payload)
-            if response.status_code == 400 and "reasoning" in payload:
-                payload.pop("reasoning", None)
-                response = await client.post(OPENROUTER_URL, headers=headers, json=payload)
-            response.raise_for_status()
-            data = response.json()
-
-        content = data.get("choices", [{}])[0].get("message", {}).get("content", "")
+        client = AsyncOpenAI(api_key=self.api_key, timeout=self.timeout_seconds)
+        try:
+            response = await client.responses.create(**payload)
+        except Exception:
+            if "reasoning" not in payload:
+                raise
+            payload.pop("reasoning", None)
+            response = await client.responses.create(**payload)
+        content = getattr(response, "output_text", None) or str(response)
         return parse_planned_queries(content, self.max_queries)
 
 

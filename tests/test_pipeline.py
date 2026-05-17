@@ -9,7 +9,7 @@ from prophet_arena_agent.models import ProphetEvent
 def test_predict_event_runs_forecaster_verifier_and_synthesizer(monkeypatch) -> None:
     calls: list[str] = []
 
-    async def fake_call_openrouter_messages(messages: list[dict[str, str]], *, stage: str) -> dict:
+    async def fake_call_openai_messages(messages: list[dict[str, str]], *, stage: str) -> dict:
         calls.append(stage)
         if stage == "forecaster":
             return {"probabilities": {"Yes": 0.7, "No": 0.3}, "rationale": "draft"}
@@ -26,8 +26,8 @@ def test_predict_event_runs_forecaster_verifier_and_synthesizer(monkeypatch) -> 
 
     monkeypatch.setattr(
         forecast_module,
-        "call_openrouter_messages",
-        fake_call_openrouter_messages,
+        "call_openai_messages",
+        fake_call_openai_messages,
     )
     monkeypatch.setattr(forecast_module.ExaRetriever, "from_env", staticmethod(lambda: None))
     monkeypatch.setenv("FORECAST_BRANCH_COUNT", "2")

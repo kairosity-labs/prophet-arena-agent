@@ -26,12 +26,12 @@ Each `market` is copied exactly from `event.outcomes`, and each probability is c
 Copy `.env.example` to `.env` locally or set these variables in your deployment host:
 
 ```bash
-OPENROUTER_API_KEY=...
-OPENROUTER_MODEL=openai/gpt-5.4
-OPENROUTER_REASONING_EFFORT=medium
-OPENROUTER_FORECASTER_MODEL=openai/gpt-5.4
-OPENROUTER_VERIFIER_MODEL=openai/gpt-5.4
-OPENROUTER_SYNTHESIZER_MODEL=openai/gpt-5.4
+OPENAI_API_KEY=...
+OPENAI_MODEL=gpt-5.5
+OPENAI_REASONING_EFFORT=medium
+OPENAI_FORECASTER_MODEL=gpt-5.5
+OPENAI_VERIFIER_MODEL=gpt-5.5
+OPENAI_SYNTHESIZER_MODEL=gpt-5.5
 FORECAST_BRANCH_COUNT=2
 EXA_API_KEY=...
 EXA_SEARCH_ROUNDS=2
@@ -39,7 +39,7 @@ EXA_RESULTS_PER_QUERY=4
 EXA_MAX_SOURCES=10
 EXA_RESEARCH_MODE=llm
 EXA_USE_LLM_PLANNER=true
-EXA_RESEARCH_MODEL=openai/gpt-5.4-mini
+EXA_RESEARCH_MODEL=gpt-5.4-mini
 EXA_RESEARCH_REASONING_EFFORT=low
 EXA_RESEARCH_QUERIES_PER_ROUND=4
 EXA_RESEARCH_TIMEOUT_SECONDS=25
@@ -126,7 +126,7 @@ The prompt is a compact, competition-neutral forecasting rubric:
 - Apply a simple calibration formula.
 - Return exact-label probabilities.
 
-Retrieval uses a cheaper OpenRouter planning model by default (`openai/gpt-5.4-mini`) to propose query sets before Exa search. Set `EXA_RESEARCH_MODE=structured` to skip LLM query planning and use deterministic resolver/current-state/reference-class queries. The forecaster, verifier, and synthesizer stay on the frontier model configured by `OPENROUTER_MODEL` or the per-stage overrides (`OPENROUTER_FORECASTER_MODEL`, `OPENROUTER_VERIFIER_MODEL`, `OPENROUTER_SYNTHESIZER_MODEL`).
+Retrieval uses a cheaper OpenAI planning model by default (`gpt-5.4-mini`) with `OPENAI_API_KEY` to propose query sets before Exa search. Set `EXA_RESEARCH_MODE=structured` to skip LLM query planning and use deterministic resolver/current-state/reference-class queries. The forecaster, verifier, and synthesizer stay on the OpenAI frontier model configured by `OPENAI_MODEL` or the per-stage overrides (`OPENAI_FORECASTER_MODEL`, `OPENAI_VERIFIER_MODEL`, `OPENAI_SYNTHESIZER_MODEL`).
 `FORECAST_BRANCH_COUNT` controls how many independent forecaster->verifier branches run after retrieval; the default is `2`.
 
 The ExaResearch planner prompt asks for:
