@@ -1,0 +1,15 @@
+services:
+  - type: web
+    name: prophet-arena-agent
+    runtime: docker
+    plan: starter
+    healthCheckPath: /health
+    envVars:
+      - key: OPENROUTER_API_KEY
+        sync: false
+      - key: OPENROUTER_MODEL
+        value: openai/gpt-5.4
+      - key: OPENROUTER_REASONING_EFFORT
+        value: medium
+      - key: AGENT_API_KEY
+        sync: false
